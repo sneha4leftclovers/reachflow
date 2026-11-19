@@ -1,0 +1,70 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-and-typecheck:
+    name: Lint, Typecheck & Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: reachflow
+          MYSQL_USER: reachflow
+          MYSQL_PASSWORD: reachflowpassword
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+
+    env:
+      DATABASE_URL: "mysql://reachflow:reachflowpassword@127.0.0.1:3306/reachflow"
+      JWT_ACCESS_SECRET: "ci-access-secret-minimum-32-chars-long-key-spec"
+      JWT_REFRESH_SECRET: "ci-refresh-secret-minimum-32-chars-long-key-spec"
+      PORT: 4000
+      NODE_ENV: test
+      FRONTEND_URL: "http://localhost:3000"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.21.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Approve package builds
+        run: pnpm approve-builds --all
+
+      - name: Build shared packages
+        run: |
+          pnpm --filter @reachflow/shared run build
+          pnpm --filter @reachflow/db run build
+
+      - name: Run Prisma migrations / db push
+        run: pnpm --filter @reachflow/db run push
+
+      - name: Run typecheck across all workspaces
+        run: pnpm -r typecheck
+
+      - name: Run API test suite (Tenant Isolation, Auth & Idempotency)
+        run: pnpm --filter @reachflow/api test
+
+      - name: Verify Web production build
+        run: pnpm --filter @reachflow/web run build
