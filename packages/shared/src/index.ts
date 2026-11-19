@@ -47,6 +47,7 @@ export interface ApiResponse<T = any> {
     cursor?: string | null;
     hasNextPage?: boolean;
     total?: number;
+    [key: string]: any;
   };
 }
 
