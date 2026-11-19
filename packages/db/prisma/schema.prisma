@@ -1,0 +1,233 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  MEMBER
+}
+
+enum ContactStatus {
+  ACTIVE
+  BOUNCED
+  UNSUBSCRIBED
+}
+
+enum DealStage {
+  LEAD
+  QUALIFIED
+  DEMO
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum SequenceStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  REPLIED
+}
+
+model User {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  memberships  Membership[]
+  refreshTokens RefreshToken[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@map("users")
+}
+
+model Workspace {
+  id          String        @id @default(uuid())
+  name        String
+  slug        String        @unique
+  memberships Membership[]
+  contacts    Contact[]
+  tags        Tag[]
+  deals       Deal[]
+  sequences   Sequence[]
+  enrollments Enrollment[]
+  emailMessages EmailMessage[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("workspaces")
+}
+
+model Membership {
+  id          String    @id @default(uuid())
+  userId      String
+  workspaceId String
+  role        Role      @default(MEMBER)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+  @@map("memberships")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  isRevoked Boolean  @default(false)
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Tag {
+  id          String       @id @default(uuid())
+  workspaceId String
+  name        String
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contacts    ContactTag[]
+  createdAt   DateTime     @default(now())
+
+  @@unique([workspaceId, name])
+  @@map("tags")
+}
+
+model Contact {
+  id           String        @id @default(uuid())
+  workspaceId  String
+  email        String
+  firstName    String
+  lastName     String
+  company      String?
+  title        String?
+  phone        String?
+  status       ContactStatus @default(ACTIVE)
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tags         ContactTag[]
+  deals        Deal[]
+  enrollments  Enrollment[]
+  emailMessages EmailMessage[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([workspaceId, email])
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, lastName, firstName])
+  @@map("contacts")
+}
+
+model ContactTag {
+  contactId String
+  tagId     String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+  @@map("contact_tags")
+}
+
+model Deal {
+  id          String    @id @default(uuid())
+  workspaceId String
+  contactId   String?
+  title       String
+  value       Float     @default(0)
+  stage       DealStage @default(LEAD)
+  position    Int       @default(0)
+  company     String?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contact     Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId, stage, position])
+  @@map("deals")
+}
+
+model Sequence {
+  id          String         @id @default(uuid())
+  workspaceId String
+  name        String
+  status      SequenceStatus @default(ACTIVE)
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  steps       SequenceStep[]
+  enrollments Enrollment[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([workspaceId])
+  @@map("sequences")
+}
+
+model SequenceStep {
+  id           String         @id @default(uuid())
+  sequenceId   String
+  stepOrder    Int
+  delayHours   Int            @default(0)
+  subject      String
+  body         String         @db.Text
+  sequence     Sequence       @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  emailMessages EmailMessage[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([sequenceId, stepOrder])
+  @@map("sequence_steps")
+}
+
+model Enrollment {
+  id               String           @id @default(uuid())
+  workspaceId      String
+  sequenceId       String
+  contactId        String
+  currentStepOrder Int              @default(1)
+  status           EnrollmentStatus @default(ACTIVE)
+  nextRunAt        DateTime         @default(now())
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sequence         Sequence         @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  contact          Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  emailMessages    EmailMessage[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([workspaceId, status, nextRunAt])
+  @@map("enrollments")
+}
+
+model EmailMessage {
+  id             String        @id @default(uuid())
+  workspaceId    String
+  enrollmentId   String
+  sequenceStepId String
+  contactId      String
+  idempotencyKey String        @unique
+  subject        String
+  body           String        @db.Text
+  sentAt         DateTime      @default(now())
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  enrollment     Enrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  sequenceStep   SequenceStep  @relation(fields: [sequenceStepId], references: [id], onDelete: Cascade)
+  contact        Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+
+  @@index([workspaceId, enrollmentId])
+  @@map("email_messages")
+}
