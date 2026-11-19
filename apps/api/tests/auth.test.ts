@@ -81,6 +81,17 @@ describe('Authentication & Token Lifecycle', () => {
     expect(newRefreshCookie).toBeDefined();
   });
 
+  it('POST /v1/auth/refresh - REUSE DETECTION: Reusing an old/revoked token revokes all family tokens', async () => {
+    // Attempting to reuse the original refreshTokenCookie (now revoked) triggers reuse detection
+    const res = await request(app)
+      .post('/v1/auth/refresh')
+      .set('Cookie', refreshTokenCookie);
+
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('TOKEN_REUSE_DETECTED');
+  });
+
   it('GET /v1/auth/me - returns user profile with valid Bearer token', async () => {
     const res = await request(app)
       .get('/v1/auth/me')

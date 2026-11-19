@@ -36,11 +36,11 @@ export function verifyAccessToken(token: string): AuthUser {
   };
 }
 
-export function generateRefreshToken(): { rawToken: string; tokenHash: string; expiresAt: Date } {
+export function generateRefreshToken(family?: string): { rawToken: string; tokenHash: string; expiresAt: Date; family: string } {
   const rawToken = crypto.randomBytes(40).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
   const expiresAt = new Date(Date.now() + env.JWT_REFRESH_EXPIRATION_DAYS * 24 * 60 * 60 * 1000);
-  return { rawToken, tokenHash, expiresAt };
+  return { rawToken, tokenHash, expiresAt, family: family || crypto.randomUUID() };
 }
 
 export function hashToken(token: string): string {

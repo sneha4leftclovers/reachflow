@@ -89,12 +89,14 @@ model RefreshToken {
   id        String   @id @default(uuid())
   userId    String
   tokenHash String   @unique
+  family    String   @default(uuid())
   isRevoked Boolean  @default(false)
   expiresAt DateTime
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([family])
   @@map("refresh_tokens")
 }
 

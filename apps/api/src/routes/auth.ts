@@ -59,11 +59,12 @@ authRouter.post('/signup', async (req, res, next) => {
         },
       });
 
-      const { rawToken, tokenHash, expiresAt } = generateRefreshToken();
+      const { rawToken, tokenHash, expiresAt, family } = generateRefreshToken();
       await tx.refreshToken.create({
         data: {
           userId: user.id,
           tokenHash,
+          family,
           expiresAt,
         },
       });
@@ -128,11 +129,12 @@ authRouter.post('/login', async (req, res, next) => {
       throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
     }
 
-    const { rawToken, tokenHash, expiresAt } = generateRefreshToken();
+    const { rawToken, tokenHash, expiresAt, family } = generateRefreshToken();
     await prisma.refreshToken.create({
       data: {
         userId: user.id,
         tokenHash,
+        family,
         expiresAt,
       },
     });
@@ -189,14 +191,31 @@ authRouter.post('/refresh', async (req, res, next) => {
       include: { user: true },
     });
 
-    if (!existingToken || existingToken.isRevoked || existingToken.expiresAt < new Date()) {
+    if (!existingToken) {
       clearRefreshTokenCookie(res);
-      throw new AppError(401, 'TOKEN_EXPIRED', 'Refresh token is invalid or expired');
+      throw new AppError(401, 'TOKEN_INVALID', 'Refresh token is invalid');
     }
 
-    // Token Rotation: revoke previous token and issue a fresh one
+    // Token Family Reuse Detection:
+    // If an already-revoked token is used, compromise is detected.
+    // Invalidate ALL tokens in this family immediately.
+    if (existingToken.isRevoked) {
+      await prisma.refreshToken.updateMany({
+        where: { family: existingToken.family },
+        data: { isRevoked: true },
+      });
+      clearRefreshTokenCookie(res);
+      throw new AppError(401, 'TOKEN_REUSE_DETECTED', 'Compromised refresh token reused. All sessions revoked.');
+    }
+
+    if (existingToken.expiresAt < new Date()) {
+      clearRefreshTokenCookie(res);
+      throw new AppError(401, 'TOKEN_EXPIRED', 'Refresh token has expired');
+    }
+
+    // Token Rotation: revoke previous token and issue a fresh one in the same family
     const { rawToken: nextRawToken, tokenHash: nextTokenHash, expiresAt: nextExpiresAt } =
-      generateRefreshToken();
+      generateRefreshToken(existingToken.family);
 
     await prisma.$transaction([
       prisma.refreshToken.update({
@@ -207,6 +226,7 @@ authRouter.post('/refresh', async (req, res, next) => {
         data: {
           userId: existingToken.userId,
           tokenHash: nextTokenHash,
+          family: existingToken.family,
           expiresAt: nextExpiresAt,
         },
       }),
@@ -317,11 +337,12 @@ authRouter.post('/demo', async (req, res, next) => {
       throw new AppError(404, 'DEMO_NOT_FOUND', 'Demo user not seeded yet. Please run db:seed.');
     }
 
-    const { rawToken, tokenHash, expiresAt } = generateRefreshToken();
+    const { rawToken, tokenHash, expiresAt, family } = generateRefreshToken();
     await prisma.refreshToken.create({
       data: {
         userId: demoUser.id,
         tokenHash,
+        family,
         expiresAt,
       },
     });
