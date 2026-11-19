@@ -5,6 +5,30 @@
 
 ---
 
+## 📸 Screenshots
+
+### 1. Authentication & 1-Click Recruiter Demo
+![Sign in & 1-Click Demo](Docs/Screenshots/Screenshot%202026-11-20%20030025.png)
+*Authentication screen featuring instant 1-click recruiter demo access into the pre-seeded Acme Corp workspace.*
+
+### 2. Contacts & Accounts Management
+![Contacts & Accounts Management](Docs/Screenshots/Screenshot%202026-11-20%20030044.png)
+*Prospect data table with tag filtering, real-time search, workspace switcher, and cursor pagination.*
+
+### 3. Interactive Deals Kanban Pipeline
+![Deals Kanban Board](Docs/Screenshots/Screenshot%202026-11-20%20030101.png)
+*Drag-and-drop Kanban board across 6 deal stages with real-time pipeline value aggregation and optimistic updates.*
+
+### 4. Multi-Step Email Sequence Builder
+![Email Sequence Builder](Docs/Screenshots/Screenshot%202026-11-20%20030133.png)
+*Visual sequence builder displaying scheduled email touchpoints with delay intervals and dynamic merge tags.*
+
+### 5. Sequence Enrollment & Inbound Reply Simulation
+![Sequence Enrollment & Reply Simulation](Docs/Screenshots/Screenshot%202026-11-20%20030146.png)
+*Prospect enrollment tracker with sent email metrics and 1-click inbound reply simulation to immediately halt outbound drips.*
+
+---
+
 ## ⚡ Quickstart (Local Setup in Under 5 Commands)
 
 ```bash
