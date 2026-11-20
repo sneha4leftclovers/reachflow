@@ -49,6 +49,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Generate Prisma client
+        run: pnpm --filter @reachflow/db exec prisma generate
+
       - name: Approve package builds
         run: pnpm approve-builds --all
 
